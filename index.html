@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>교대근무 자동 캘린더</title>
+  <style>
+    :root {
+      --canvas: #ffffff;
+      --surface: #f9f8f7;
+      --surface-2: #f0efed;
+      --text: #2c2c2b;
+      --muted: #7d7a75;
+      --border: #e6e5e3;
+      --blue: #2783de;
+      --blue-soft: #e5f2fc;
+      --green: #46a171;
+      --green-soft: #e8f1ec;
+      --orange: #d5803b;
+      --orange-soft: #fbebde;
+      --red: #e56458;
+      --red-soft: #fce9e7;
+      --purple: #8b6bd8;
+      --purple-soft: #f0ebfb;
+      --shadow: 0 1px 2px rgba(0,0,0,.05), 0 8px 24px rgba(0,0,0,.05);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background: linear-gradient(180deg, #ffffff 0%, #fbfaf9 100%);
+      min-height: 100vh;
+    }
+
+    .wrap {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+
+    .eyebrow {
+      color: var(--blue);
+      font-weight: 700;
+      font-size: 13px;
+      letter-spacing: .02em;
+      margin-bottom: 6px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(25px, 4vw, 42px);
+      line-height: 1.05;
+      letter-spacing: -0.04em;
+    }
+
+    .subtitle {
+      margin: 10px 0 0;
+      color: var(--muted);
+      line-height: 1.5;
+      max-width: 620px;
+      font-size: 15px;
+    }
+
+    .today-pill {
+      flex: 0 0 auto;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 12px 14px;
+      min-width: 146px;
+      text-align: right;
+      box-shadow: var(--shadow);
+    }
+
+    .today-pill .label { color: var(--muted); font-size: 12px; }
+    .today-pill .value { font-size: 18px; font-weight: 800; margin-top: 2px; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 330px 1fr;
+      gap: 16px;
+      align-items: start;
+    }
+
+    .panel, .calendar-card {
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.92);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+    }
+
+    .panel { padding: 16px; }
+
+    label {
+      display: block;
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 700;
+      margin: 14px 0 7px;
+    }
+
+    label:first-child { margin-top: 0; }
+
+    input, textarea, button {
+      font: inherit;
+    }
+
+    input, textarea {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface);
+      color: var(--text);
+      padding: 11px 12px;
+      outline: none;
+      transition: .15s border, .15s background;
+    }
+
+    input:focus, textarea:focus {
+      border-color: var(--blue);
+      background: #fff;
+      box-shadow: 0 0 0 3px rgba(39,131,222,.12);
+    }
+
+    textarea {
+      min-height: 82px;
+      resize: vertical;
+      line-height: 1.45;
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+      margin-top: 7px;
+    }
+
+    .quick-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .color-settings {
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+    }
+
+    .section-title {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+
+    .color-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+      min-height: 52px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .color-row:last-of-type { border-bottom: 0; }
+
+    .color-name {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 13px;
+      font-weight: 700;
+      padding-top: 7px;
+    }
+
+    .color-tools {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 5px;
+      flex-wrap: wrap;
+      max-width: 196px;
+    }
+
+    .swatches {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 4px;
+    }
+
+    .swatch {
+      width: 22px;
+      height: 22px;
+      padding: 0;
+      border: 2px solid transparent;
+      border-radius: 7px;
+      cursor: pointer;
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,.12);
+    }
+
+    .swatch:hover { transform: scale(1.08); }
+    .swatch:focus-visible, .color-picker:focus-visible, .color-reset:focus-visible {
+      outline: 3px solid rgba(39,131,222,.28);
+      outline-offset: 2px;
+    }
+    .swatch.active { border-color: var(--text); }
+
+    .color-picker-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .color-value {
+      color: var(--muted);
+      font: 10px/1.1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      min-width: 58px;
+      text-align: right;
+    }
+
+    .color-picker {
+      width: 30px;
+      height: 26px;
+      padding: 2px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: var(--surface);
+      cursor: pointer;
+    }
+
+    .color-reset {
+      width: 100%;
+      min-height: 34px;
+      margin-top: 6px;
+      border: 1px dashed var(--border);
+      border-radius: 9px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .color-reset:hover { background: var(--surface); color: var(--text); }
+
+    .chip, .nav-btn, .primary-btn, .ghost-btn {
+      min-height: 40px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text);
+      cursor: pointer;
+      transition: .15s transform, .15s background, .15s border;
+      font-weight: 700;
+    }
+
+    .chip { padding: 8px 10px; font-size: 12px; }
+    .chip:hover, .nav-btn:hover, .ghost-btn:hover { background: var(--surface); }
+    button:active { transform: translateY(1px); }
+
+    .actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .primary-btn {
+      background: var(--blue);
+      border-color: var(--blue);
+      color: #fff;
+      min-height: 44px;
+    }
+    .primary-btn:hover { background: #1f75ca; }
+
+    .ghost-btn { min-height: 44px; }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 9px;
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .dot { width: 9px; height: 9px; border-radius: 99px; display: inline-block; }
+
+    .calendar-card { overflow: hidden; }
+    .calendar-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    .month-title {
+      font-size: 22px;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+    }
+
+    .nav { display: flex; gap: 8px; align-items: center; }
+    .nav-btn { width: 42px; height: 42px; font-size: 18px; }
+
+    .calendar {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      background: var(--border);
+      gap: 1px;
+    }
+
+    .dow, .day {
+      background: #fff;
+      min-height: 86px;
+      padding: 9px;
+    }
+
+    .dow {
+      min-height: auto;
+      padding: 10px 8px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      background: #fbfaf9;
+    }
+
+    .dow.sun { color: var(--red); }
+    .dow.sat { color: var(--blue); }
+
+    .day {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      position: relative;
+    }
+
+    .day.dim { background: #fbfaf9; color: #bbb7b1; }
+    .day.today { outline: 2px solid var(--blue); outline-offset: -2px; z-index: 1; }
+
+    .num {
+      font-size: 13px;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .shift {
+      margin-top: auto;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 30px;
+      width: 100%;
+      border-radius: 9px;
+      font-weight: 900;
+      font-size: 13px;
+      letter-spacing: -0.02em;
+      border: 1px solid rgba(0,0,0,.04);
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      padding: 12px 16px 16px;
+      background: #fff;
+      border-top: 1px solid var(--border);
+    }
+
+    .sum-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px;
+    }
+    .sum-card .name { color: var(--muted); font-size: 12px; font-weight: 800; }
+    .sum-card .count { font-size: 22px; font-weight: 900; margin-top: 3px; }
+
+    .toast {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      background: #2c2c2b;
+      color: #fff;
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 13px;
+      opacity: 0;
+      transform: translateY(8px);
+      pointer-events: none;
+      transition: .2s ease;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+    @media (max-width: 850px) {
+      .wrap { padding: 18px; }
+      header { flex-direction: column; }
+      .today-pill { width: 100%; text-align: left; }
+      .grid { grid-template-columns: 1fr; }
+      .dow, .day { min-height: 72px; padding: 7px; }
+      .shift { min-height: 27px; font-size: 12px; }
+      .summary { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 470px) {
+      .wrap { padding: 14px; }
+      .calendar-top { align-items: flex-start; flex-direction: column; }
+      .nav { width: 100%; }
+      .nav-btn { flex: 1; }
+      .dow { font-size: 11px; padding: 8px 2px; }
+      .day { min-height: 62px; padding: 5px; gap: 4px; }
+      .shift { min-height: 24px; font-size: 11px; border-radius: 7px; }
+      .num { font-size: 12px; }
+      .actions { grid-template-columns: 1fr; }
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --canvas: #191919; --surface: #202020; --surface-2: #383836;
+        --text: #ffffff; --muted: rgba(255,255,255,.65); --border: rgba(255,255,255,.2);
+        --blue: #5e9fe8; --green: #72bc8f; --orange: #de9255; --red: #e97366;
+        --blue-soft: rgba(94,159,232,.14); --green-soft: rgba(114,188,143,.14);
+        --orange-soft: rgba(222,146,85,.14); --red-soft: rgba(233,115,102,.14); --purple-soft: rgba(139,107,216,.16);
+      }
+      body { background: #191919; }
+      .panel, .calendar-card, input, textarea, .chip, .nav-btn, .ghost-btn, .day, .summary { background: #202020; }
+      .calendar-top, .dow, .day.dim, .sum-card, .today-pill { background: #252524; }
+      input:focus, textarea:focus { background: #202020; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header>
+      <div>
+        <div class="eyebrow">SHIFT PATTERN CALENDAR</div>
+        <h1>입력한 교대패턴으로<br />캘린더 자동 생성</h1>
+        <p class="subtitle">시작일과 반복 패턴만 넣으면 해당 월의 근무표가 자동으로 채워집니다. 패턴은 쉼표, 공백, 줄바꿈으로 자유롭게 입력하세요.</p>
+      </div>
+      <div class="today-pill" aria-label="오늘 정보">
+        <div class="label">오늘</div>
+        <div class="value" id="todayText">-</div>
+      </div>
+    </header>
+
+    <section class="grid">
+      <aside class="panel" aria-label="근무 패턴 입력">
+        <label for="startDate">패턴 시작일</label>
+        <input type="date" id="startDate" />
+
+        <label for="pattern">반복 근무 패턴</label>
+        <textarea id="pattern" spellcheck="false" placeholder="예: 주간 야간 비번 휴무"></textarea>
+        <div class="hint">예시: <b>주간 야간 비번 휴무</b> / <b>D,D,N,N,OFF,OFF</b> / <b>조출 중출 후출 휴무</b></div>
+
+        <div class="quick-row" aria-label="빠른 패턴">
+          <button class="chip" data-pattern="주간 야간 비번 휴무">주야비휴</button>
+          <button class="chip" data-pattern="주간 주간 야간 야간 비번 휴무">주주야야비휴</button>
+          <button class="chip" data-pattern="D D N N OFF OFF">DDNNOO</button>
+        </div>
+
+        <div class="color-settings" aria-label="근무별 색상 설정">
+          <div class="section-title">근무별 색상</div>
+          <div id="colorControls"></div>
+          <div class="hint">근무형태별 색상칩을 누르거나 오른쪽 색상 버튼으로 원하는 색을 선택하세요. 변경 내용은 자동 저장됩니다.</div>
+        </div>
+
+        <div class="actions">
+          <button class="primary-btn" id="generateBtn">캘린더 만들기</button>
+          <button class="ghost-btn" id="resetBtn">초기화</button>
+        </div>
+
+        <div class="legend" id="legend" aria-label="근무 색상 범례"></div>
+      </aside>
+
+      <section class="calendar-card" aria-label="자동 생성 캘린더">
+        <div class="calendar-top">
+          <div class="month-title" id="monthTitle">-</div>
+          <div class="nav">
+            <button class="nav-btn" id="prevMonth" aria-label="이전 달">‹</button>
+            <button class="nav-btn" id="thisMonth" aria-label="이번 달">오늘</button>
+            <button class="nav-btn" id="nextMonth" aria-label="다음 달">›</button>
+          </div>
+        </div>
+        <div class="calendar" id="calendar"></div>
+        <div class="summary" id="summary"></div>
+      </section>
+    </section>
+  </main>
+  <div class="toast" id="toast" role="status" aria-live="polite">저장했어요</div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const startDateInput = $('startDate');
+    const patternInput = $('pattern');
+    const calendarEl = $('calendar');
+    const legendEl = $('legend');
+    const summaryEl = $('summary');
+    const colorControlsEl = $('colorControls');
+    const monthTitle = $('monthTitle');
+    const toast = $('toast');
+
+    const colors = [
+      ['#2783DE', '#E5F2FC'], ['#46A171', '#E8F1EC'], ['#D5803B', '#FBEBDE'], ['#E56458', '#FCE9E7'],
+      ['#8B6BD8', '#F0EBFB'], ['#4FB9C9', '#E7F7F9'], ['#DF84A8', '#FCEAF1'], ['#7D7A75', '#F0EFED']
+    ];
+    const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+    let viewDate = new Date();
+    let customColors = {};
+
+    function pad(n) { return String(n).padStart(2, '0'); }
+    function ymd(date) { return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}`; }
+    function parseLocalDate(value) {
+      const [y, m, d] = value.split('-').map(Number);
+      return new Date(y, m - 1, d);
+    }
+    function diffDays(a, b) {
+      const A = Date.UTC(a.getFullYear(), a.getMonth(), a.getDate());
+      const B = Date.UTC(b.getFullYear(), b.getMonth(), b.getDate());
+      return Math.floor((A - B) / 86400000);
+    }
+    function parsePattern() {
+      return patternInput.value.split(/[\s,，/|>→-]+/).map(v => v.trim()).filter(Boolean);
+    }
+    function shiftFor(date, pattern, start) {
+      if (!pattern.length) return '';
+      const idx = ((diffDays(date, start) % pattern.length) + pattern.length) % pattern.length;
+      return pattern[idx];
+    }
+
+    function hexToSoft(hex) {
+      const value = hex.replace('#', '');
+      const r = parseInt(value.slice(0, 2), 16);
+      const g = parseInt(value.slice(2, 4), 16);
+      const b = parseInt(value.slice(4, 6), 16);
+      return `rgba(${r}, ${g}, ${b}, .14)`;
+    }
+
+    function validHex(value) {
+      return /^#[0-9a-f]{6}$/i.test(value) ? value.toUpperCase() : null;
+    }
+
+    function colorFor(label, allLabels) {
+      const index = allLabels.indexOf(label) % colors.length;
+      const custom = validHex(customColors[label] || '');
+      return custom ? [custom, hexToSoft(custom)] : colors[index];
+    }
+
+    function setDefaults() {
+      const saved = JSON.parse(localStorage.getItem('shiftCalendar') || '{}');
+      const today = new Date();
+      startDateInput.value = saved.startDate || ymd(today);
+      patternInput.value = saved.pattern || '주간 야간 비번 휴무';
+      customColors = saved.colors && typeof saved.colors === 'object' ? saved.colors : {};
+      viewDate = saved.viewMonth ? parseLocalDate(saved.viewMonth + '-01') : new Date(today.getFullYear(), today.getMonth(), 1);
+      $('todayText').textContent = `${today.getMonth()+1}월 ${today.getDate()}일`;
+    }
+
+    function saveState() {
+      localStorage.setItem('shiftCalendar', JSON.stringify({
+        startDate: startDateInput.value,
+        pattern: patternInput.value,
+        colors: customColors,
+        viewMonth: `${viewDate.getFullYear()}-${pad(viewDate.getMonth()+1)}`
+      }));
+    }
+
+    function showToast(text='저장했어요') {
+      toast.textContent = text;
+      toast.classList.add('show');
+      clearTimeout(showToast.timer);
+      showToast.timer = setTimeout(() => toast.classList.remove('show'), 1400);
+    }
+
+    function renderColorControls(pattern) {
+      const unique = [...new Set(pattern)];
+      if (!unique.length) {
+        colorControlsEl.innerHTML = '<div class="hint">패턴을 입력하면 근무별 색상을 설정할 수 있어요.</div>';
+        return;
+      }
+      colorControlsEl.innerHTML = unique.map((label, index) => {
+        const fallback = colors[index % colors.length][0];
+        const value = validHex(customColors[label] || '') || fallback;
+        const swatches = colors.map(([solid]) => `
+          <button class="swatch ${solid === value ? 'active' : ''}" type="button"
+            style="background:${solid}" data-label="${escapeHtml(label)}" data-color="${solid}"
+            aria-label="${escapeHtml(label)} 색상 ${solid}" title="${solid}"></button>
+        `).join('');
+        return `<div class="color-row">
+          <span class="color-name" title="${escapeHtml(label)}">${escapeHtml(label)}</span>
+          <div class="color-tools">
+            <div class="swatches" aria-label="${escapeHtml(label)} 추천 색상">${swatches}</div>
+            <label class="color-picker-wrap" title="${escapeHtml(label)} 사용자 지정 색상">
+              <span class="color-value">${value}</span>
+              <input class="color-picker" type="color" value="${value}" data-label="${escapeHtml(label)}" aria-label="${escapeHtml(label)} 사용자 지정 색상">
+            </label>
+          </div>
+        </div>`;
+      }).join('') + '<button class="color-reset" id="resetColors" type="button">기본 색상으로 되돌리기</button>';
+    }
+
+    function renderLegend(pattern) {
+      const unique = [...new Set(pattern)];
+      legendEl.innerHTML = unique.map(label => {
+        const [solid, soft] = colorFor(label, unique);
+        return `<span class="legend-item"><span class="dot" style="background:${solid}"></span>${escapeHtml(label)}</span>`;
+      }).join('') || '<span class="legend-item">패턴을 입력해주세요</span>';
+    }
+
+    function escapeHtml(text) {
+      return String(text).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+    }
+
+    function renderSummary(counts, labels) {
+      summaryEl.innerHTML = labels.slice(0, 8).map(label => {
+        const [solid, soft] = colorFor(label, labels);
+        return `<div class="sum-card" style="background:${soft}"><div class="name">${escapeHtml(label)}</div><div class="count" style="color:${solid}">${counts[label] || 0}</div></div>`;
+      }).join('') || '<div class="sum-card"><div class="name">안내</div><div class="count">0</div></div>';
+    }
+
+    function renderCalendar(refreshColorControls = true) {
+      const pattern = parsePattern();
+      const labels = [...new Set(pattern)];
+      const start = startDateInput.value ? parseLocalDate(startDateInput.value) : new Date();
+      const year = viewDate.getFullYear();
+      const month = viewDate.getMonth();
+      const todayKey = ymd(new Date());
+      monthTitle.textContent = `${year}년 ${month + 1}월`;
+
+      calendarEl.innerHTML = dayNames.map((d, i) => `<div class="dow ${i===0?'sun':i===6?'sat':''}">${d}</div>`).join('');
+      const first = new Date(year, month, 1);
+      const startGrid = new Date(year, month, 1 - first.getDay());
+      const counts = {};
+
+      for (let i = 0; i < 42; i++) {
+        const date = new Date(startGrid.getFullYear(), startGrid.getMonth(), startGrid.getDate() + i);
+        const inMonth = date.getMonth() === month;
+        const label = shiftFor(date, pattern, start);
+        if (inMonth && label) counts[label] = (counts[label] || 0) + 1;
+        const [solid, soft] = label ? colorFor(label, labels) : ['#7D7A75', '#F0EFED'];
+        const cell = document.createElement('div');
+        cell.className = `day ${inMonth ? '' : 'dim'} ${ymd(date) === todayKey ? 'today' : ''}`;
+        cell.innerHTML = `<div class="num">${date.getDate()}</div>${label ? `<div class="shift" style="color:${solid};background:${soft}">${escapeHtml(label)}</div>` : ''}`;
+        calendarEl.appendChild(cell);
+      }
+      if (refreshColorControls) renderColorControls(pattern);
+      renderLegend(pattern);
+      renderSummary(counts, labels);
+      saveState();
+    }
+
+    $('generateBtn').addEventListener('click', () => { renderCalendar(); showToast('캘린더를 만들었어요'); });
+    $('resetBtn').addEventListener('click', () => {
+      localStorage.removeItem('shiftCalendar');
+      setDefaults();
+      renderCalendar();
+      showToast('초기화했어요');
+    });
+    $('prevMonth').addEventListener('click', () => { viewDate.setMonth(viewDate.getMonth() - 1); renderCalendar(); });
+    $('nextMonth').addEventListener('click', () => { viewDate.setMonth(viewDate.getMonth() + 1); renderCalendar(); });
+    $('thisMonth').addEventListener('click', () => { const t = new Date(); viewDate = new Date(t.getFullYear(), t.getMonth(), 1); renderCalendar(); });
+    document.querySelectorAll('.chip').forEach(btn => btn.addEventListener('click', () => { patternInput.value = btn.dataset.pattern; renderCalendar(); }));
+    [startDateInput, patternInput].forEach(el => el.addEventListener('change', renderCalendar));
+    colorControlsEl.addEventListener('input', (event) => {
+      const input = event.target.closest('.color-picker');
+      if (!input) return;
+      customColors[input.dataset.label] = input.value.toUpperCase();
+      const row = input.closest('.color-row');
+      row.querySelector('.color-value').textContent = input.value.toUpperCase();
+      row.querySelectorAll('.swatch').forEach(swatch => {
+        swatch.classList.toggle('active', swatch.dataset.color === input.value.toUpperCase());
+      });
+      renderCalendar(false);
+      showToast('색상을 적용했어요');
+    });
+    colorControlsEl.addEventListener('click', (event) => {
+      const swatch = event.target.closest('.swatch');
+      if (swatch) {
+        const label = swatch.dataset.label;
+        const color = swatch.dataset.color.toUpperCase();
+        customColors[label] = color;
+        const row = swatch.closest('.color-row');
+        row.querySelector('.color-picker').value = color;
+        row.querySelector('.color-value').textContent = color;
+        row.querySelectorAll('.swatch').forEach(item => item.classList.toggle('active', item === swatch));
+        renderCalendar(false);
+        showToast('색상을 적용했어요');
+        return;
+      }
+      if (event.target.id !== 'resetColors') return;
+      customColors = {};
+      renderCalendar();
+      showToast('기본 색상으로 되돌렸어요');
+    });
+
+    setDefaults();
+    renderCalendar();
+  </script>
+</body>
+</html>
